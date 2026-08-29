@@ -285,6 +285,10 @@ patch(PaymentScreen.prototype, {
             this.pos.showScreen("ProductScreen");
         }
 
+        // Printing is intentionally detached from cashier navigation. Keep the
+        // order-level queue serial so customer receipt and preparation tickets
+        // preserve their order without holding the POS UI hostage when the
+        // local Windows agent is unavailable or a printer fails.
         void this.pos._enqueuePOSAgentOrderPrint(async () => {
             try {
                 await this.pos.printReceipt({ order });

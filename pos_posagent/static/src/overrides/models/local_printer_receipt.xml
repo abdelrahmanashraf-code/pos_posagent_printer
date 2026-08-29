@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="pos_posagent.LocalPreparationReceipt" t-inherit="point_of_sale.OrderChangeReceipt" t-inherit-mode="primary">
+        <xpath expr="//span[contains(text(), 'By:')]" position="replace"/>
+        <xpath expr="//div[@class='receipt-header text-center']/div[@class='pos-receipt-title']" position="replace">
+            <div class="pos-receipt-title" t-esc="changes.headerLabel"/>
+        </xpath>
+    </t>
+</templates>

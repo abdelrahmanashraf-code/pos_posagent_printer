@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_pos_category_form_view_local_printer" model="ir.ui.view">
+        <field name="name">pos.category.form.local.printer</field>
+        <field name="model">pos.category</field>
+        <field name="inherit_id" ref="point_of_sale.product_pos_category_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group[@name='sequence']" position="after">
+                <group name="local_printer">
+                    <field name="print_on_local_printer"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
