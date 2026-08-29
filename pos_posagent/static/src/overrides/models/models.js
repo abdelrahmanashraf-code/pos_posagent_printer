@@ -139,6 +139,37 @@ patch(PosStore.prototype, {
         return current;
     },
 
+    _schedulePOSAgentOrderPrint(order) {
+        if (!order || typeof order !== "object") {
+            return false;
+        }
+
+        this._posAgentScheduledOrderPrints ||= new WeakSet();
+        if (this._posAgentScheduledOrderPrints.has(order)) {
+            return false;
+        }
+        this._posAgentScheduledOrderPrints.add(order);
+
+        // Start the local print sequence independently from the backend sync.
+        // The order-level queue preserves Customer -> Preparation order, while
+        // the WeakSet prevents afterOrderValidation/offline paths from scheduling
+        // the same physical print sequence a second time.
+        void this._enqueuePOSAgentOrderPrint(async () => {
+            try {
+                await this.printReceipt({ order });
+            } catch (error) {
+                console.error("POSAgent customer receipt failed", error);
+            }
+
+            try {
+                await this.sendOrderInPreparation(order);
+            } catch (error) {
+                console.error("POSAgent preparation printing failed", error);
+            }
+        });
+        return true;
+    },
+
     async printReceipt() {
         if (!this.config.use_posagent || !this.config.posagent_enable_printer) {
             return super.printReceipt(...arguments);
@@ -230,6 +261,12 @@ patch(PaymentScreen.prototype, {
 
         this.pos.addPendingOrder([this.currentOrder.id]);
         this.currentOrder.state = "paid";
+
+        // Printing must not wait for network/server latency. At this point Odoo's
+        // payment validation has completed and the local order is final enough to
+        // render. Backend synchronization continues independently below.
+        this.pos._schedulePOSAgentOrderPrint(this.currentOrder);
+
         this.env.services.ui.block();
         let syncOrderResult;
         try {
@@ -279,28 +316,14 @@ patch(PaymentScreen.prototype, {
         const order = this.currentOrder;
         order.set_screen_data({ name: "" });
 
+        // Safe on both online and offline paths. If _finalizeValidation already
+        // started printing, the WeakSet guard makes this a no-op.
+        this.pos._schedulePOSAgentOrderPrint(order);
+
         const switchScreen = order.uuid === this.pos.selectedOrderUuid;
         if (switchScreen) {
             this.selectNextOrder();
             this.pos.showScreen("ProductScreen");
         }
-
-        // Printing is intentionally detached from cashier navigation. Keep the
-        // order-level queue serial so customer receipt and preparation tickets
-        // preserve their order without holding the POS UI hostage when the
-        // local Windows agent is unavailable or a printer fails.
-        void this.pos._enqueuePOSAgentOrderPrint(async () => {
-            try {
-                await this.pos.printReceipt({ order });
-            } catch (error) {
-                console.error("POSAgent customer receipt failed", error);
-            }
-
-            try {
-                await this.pos.sendOrderInPreparation(order);
-            } catch (error) {
-                console.error("POSAgent preparation printing failed", error);
-            }
-        });
     },
 });
