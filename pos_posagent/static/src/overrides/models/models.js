@@ -65,7 +65,7 @@ function preparePOSAgentReceipt(receipt) {
 
     const localFontStyle = document.createElement("style");
     localFontStyle.textContent =
-        "*,*::before,*::after{font-family:Arial,'Segoe UI',sans-serif!important;}";
+        "*,*::before,*::after{font-family:Arial,'Segoe UI',sans-serif!important;color:#000!important;}";
     safeReceipt.prepend(localFontStyle);
     return safeReceipt;
 }
@@ -84,7 +84,11 @@ async function posAgentReceiptToCanvas(receipt) {
             backgroundColor: "#ffffff",
             height: Math.ceil(safeReceipt.clientHeight),
             width: Math.ceil(safeReceipt.clientWidth),
-            pixelRatio: 1,
+            // POSAgent rasterizes the receipt again to the thermal head width
+            // (384px for 58mm / 576px for 80mm). Rendering at 2x here keeps
+            // text edges sharp before that downscale and avoids the previous
+            // low-resolution 1x image being enlarged by the agent.
+            pixelRatio: 2,
             includeQueryParams: true,
             skipFonts: true,
         });
