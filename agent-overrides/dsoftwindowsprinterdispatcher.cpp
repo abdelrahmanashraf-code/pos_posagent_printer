@@ -91,6 +91,8 @@ bool DSoftWindowsPrinterDispatcher::dispatch(const PrinterProfile &profile,
                       profile.windowsPrinterName.toLocal8Bit().constData());
   spooler_->setString("protocol_type", "escpos");
   spooler_->setInt("max_width", profile.paperWidthMm <= 58 ? 384 : 576);
+  // Keep the existing ESC/POS gamma: black remains solid while anti-aliased
+  // edges are darkened before the 1-bit raster conversion.
   spooler_->setInt("gamma", 240);
   spooler_->setInt("lines_to_feed", 4);
   spooler_->setInt("paper_cut", 1);
