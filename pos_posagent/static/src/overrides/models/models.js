@@ -84,10 +84,6 @@ async function posAgentReceiptToCanvas(receipt) {
             backgroundColor: "#ffffff",
             height: Math.ceil(safeReceipt.clientHeight),
             width: Math.ceil(safeReceipt.clientWidth),
-            // POSAgent rasterizes the receipt again to the thermal head width
-            // (384px for 58mm / 576px for 80mm). Rendering at 2x here keeps
-            // text edges sharp before that downscale and avoids the previous
-            // low-resolution 1x image being enlarged by the agent.
             pixelRatio: 2,
             includeQueryParams: true,
             skipFonts: true,
@@ -154,10 +150,6 @@ patch(PosStore.prototype, {
         }
         this._posAgentScheduledOrderPrints.add(order);
 
-        // Start the local print sequence independently from the backend sync.
-        // The order-level queue preserves Customer -> Preparation order, while
-        // the WeakSet prevents afterOrderValidation/offline paths from scheduling
-        // the same physical print sequence a second time.
         void this._enqueuePOSAgentOrderPrint(async () => {
             try {
                 await this.printReceipt({ order });
@@ -265,10 +257,6 @@ patch(PaymentScreen.prototype, {
 
         this.pos.addPendingOrder([this.currentOrder.id]);
         this.currentOrder.state = "paid";
-
-        // Printing must not wait for network/server latency. At this point Odoo's
-        // payment validation has completed and the local order is final enough to
-        // render. Backend synchronization continues independently below.
         this.pos._schedulePOSAgentOrderPrint(this.currentOrder);
 
         this.env.services.ui.block();
@@ -319,9 +307,6 @@ patch(PaymentScreen.prototype, {
 
         const order = this.currentOrder;
         order.set_screen_data({ name: "" });
-
-        // Safe on both online and offline paths. If _finalizeValidation already
-        // started printing, the WeakSet guard makes this a no-op.
         this.pos._schedulePOSAgentOrderPrint(order);
 
         const switchScreen = order.uuid === this.pos.selectedOrderUuid;
