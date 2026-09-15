@@ -54,5 +54,7 @@ if (-not (Select-String -Path $mainWindowPath -SimpleMatch 'DSoft POS Printer Ag
     throw 'DSoft window title was not applied.'
 }
 
+& (Join-Path $PSScriptRoot 'apply-print-quality-fixes.ps1')
+
 Write-Host 'Applied minimal DSoft single-printer mode.'
 Write-Host 'No profiles, routing dashboard, login, queue service, startup manager, or extra status services were added.'
