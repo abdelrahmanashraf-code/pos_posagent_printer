@@ -2,7 +2,7 @@
 
 {
     'name': 'POSAgent for Community Edition Direct Print Cash Drawer',
-    'version': '18.0.2.6.0',
+    'version': '18.0.2.7.0',
     'author': 'Diego A.',
     'support': 'diegoandino@gmail.com',
     'category': 'Sales/Point of Sale',
@@ -12,12 +12,13 @@
 
 This module enables the use of PosAgent as an alternative proxy service to interface with POS hardware.
 
-Customer receipts and locally selected preparation categories are printed automatically
+Customer receipts and configurable preparation departments are printed automatically
 through a background POSAgent queue, without blocking cashier navigation or opening the
 browser print dialog when the local agent is unavailable.
 """,
     'depends': ['point_of_sale'],
     'data': [
+        'security/ir.model.access.csv',
         'views/pos_config_views.xml',
         'views/pos_category_views.xml',
     ],
