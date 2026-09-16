@@ -27,14 +27,25 @@ function getPreparationHeaderLabel(order) {
 }
 
 patch(PosStore.prototype, {
-    async sendOrderInPreparation(order, cancelled = false) {
+    async sendOrderInPreparation(order, opts = {}) {
         if (!this.config.use_posagent || !this.config.posagent_enable_preparation_printer) {
             return super.sendOrderInPreparation(...arguments);
         }
 
         const args = arguments;
+        const cancelled =
+            typeof opts === "boolean" ? opts : Boolean(opts && typeof opts === "object" && opts.cancelled);
         return this._enqueuePOSAgentPrint(async () => {
-            await this._printLocalPrinterChanges(order, cancelled);
+            const preparationPrinted = await this._printLocalPrinterChanges(order, cancelled);
+            if (!preparationPrinted) {
+                this.env?.services?.notification?.add(
+                    _t("Preparation printer unavailable. Order continued without blocking."),
+                    {
+                        title: _t("Preparation Printing"),
+                        type: "warning",
+                    }
+                );
+            }
             return super.sendOrderInPreparation(...args);
         });
     },
@@ -53,7 +64,7 @@ patch(PosStore.prototype, {
     async _printLocalPrinterChanges(order, cancelled) {
         const routes = this._getPOSAgentPreparationRoutes();
         if (!routes.length) {
-            return;
+            return true;
         }
 
         const routeByCategory = new Map();
@@ -65,7 +76,7 @@ patch(PosStore.prototype, {
         }
         const categoryIds = new Set(routeByCategory.keys());
         if (!categoryIds.size) {
-            return;
+            return true;
         }
 
         const orderChange = changesToOrder(order, false, categoryIds, cancelled);
@@ -99,25 +110,29 @@ patch(PosStore.prototype, {
             return (this.config.posagent_preparation_printer_code || "").trim();
         };
 
+        let allPrinted = true;
         for (const [categoryId, lines] of groupByCategory(orderChange.new)) {
             const route = routeByCategory.get(categoryId);
             const category = route?.category_id;
-            await this._printLocalReceipt(
+            const printed = await this._printLocalReceipt(
                 order,
                 category?.name || _t("New"),
                 lines,
                 getPrinterCode(route)
             );
+            allPrinted = printed && allPrinted;
         }
         for (const [categoryId, lines] of groupByCategory(orderChange.cancelled)) {
             const route = routeByCategory.get(categoryId);
-            await this._printLocalReceipt(
+            const printed = await this._printLocalReceipt(
                 order,
                 _t("Cancelled"),
                 lines,
                 getPrinterCode(route)
             );
+            allPrinted = printed && allPrinted;
         }
+        return allPrinted;
     },
 
     async _printLocalReceipt(order, title, lines, printerCode = "") {
@@ -129,14 +144,19 @@ patch(PosStore.prototype, {
             changedlines: lines,
             fullReceipt: false,
         });
-        const printed = await this.printer.printHtml(receipt, {
-            webPrintFallback: false,
-            posagentPrinterCode: printerCode,
-            posagentCut: Boolean(this.config.posagent_preparation_auto_cut),
-        });
-        if (!printed) {
-            throw new Error(`POSAgent preparation receipt failed: ${title}`);
+        try {
+            const printed = await this.printer.printHtml(receipt, {
+                webPrintFallback: false,
+                posagentPrinterCode: printerCode,
+                posagentCut: Boolean(this.config.posagent_preparation_auto_cut),
+            });
+            if (!printed) {
+                console.warn(`POSAgent preparation receipt was not printed: ${title}`);
+            }
+            return Boolean(printed);
+        } catch (error) {
+            console.warn(`POSAgent preparation receipt failed: ${title}`, error);
+            return false;
         }
     },
 });
-
