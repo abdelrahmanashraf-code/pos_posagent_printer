@@ -14,16 +14,17 @@ function relationId(value) {
 }
 
 function getPreparationHeaderLabel(order) {
-    if (order.order_type === "dine_in") {
+    const serviceType = order.ds_service_type || order.order_type;
+    if (serviceType === "dine_in") {
         return _t("Dine In");
     }
-    if (order.order_type === "pickup") {
-        return _t("Pickup");
+    if (serviceType === "takeaway" || serviceType === "pickup") {
+        return _t("Takeaway");
     }
-    if (order.order_type === "delivery") {
+    if (serviceType === "delivery") {
         return _t("Delivery");
     }
-    return order.takeaway ? _t("Take Out") : _t("Dine In");
+    return order.takeaway ? _t("Takeaway") : _t("Dine In");
 }
 
 patch(PosStore.prototype, {
