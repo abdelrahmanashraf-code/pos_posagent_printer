@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!-- Legacy view kept only so upgrades deactivate the old global category setting.
+         Preparation departments are now configured per POS. -->
     <record id="product_pos_category_form_view_local_printer" model="ir.ui.view">
-        <field name="name">pos.category.form.local.printer</field>
+        <field name="name">pos.config.form.local.printer.legacy</field>
         <field name="model">pos.category</field>
         <field name="inherit_id" ref="point_of_sale.product_pos_category_form_view"/>
+        <field name="active" eval="False"/>
         <field name="arch" type="xml">
             <xpath expr="//group[@name='sequence']" position="after">
                 <group name="local_printer">
