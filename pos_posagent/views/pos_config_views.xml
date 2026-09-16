@@ -9,24 +9,47 @@
                 <setting
                  string="Use POSAgent"
                  help="Enable using POSAgent proxy server for POS Hardware"
-                 title="Use POS Agent as proxy service to print directly
-                without the print dialog, additionally, it allows you to use a cash box. Note
-                that enabling this overrides the IoTBox settings.">
-                <field name="use_posagent"/>
-                <div class="content-group pos_posagent_config" invisible="not use_posagent">
-                    <div class="row">
-                        <label string="Proxy Port" for="pos_agent_port" class="col-lg-4 o_light_label"/>
-                        <field name="pos_agent_port"/>
+                 title="Use POS Agent as proxy service to print directly without the print dialog. It can also drive the cash drawer and preparation printers.">
+                    <field name="use_posagent"/>
+                    <div class="content-group pos_posagent_config" invisible="not use_posagent">
+                        <div class="row">
+                            <label string="Proxy Port" for="pos_agent_port" class="col-lg-4 o_light_label"/>
+                            <field name="pos_agent_port"/>
+                        </div>
+                        <div class="row">
+                            <label string="Receipt Printer" for="posagent_enable_printer" class="col-lg-4 o_light_label"/>
+                            <field name="posagent_enable_printer"/>
+                        </div>
+                        <div class="row" invisible="not posagent_enable_printer">
+                            <label string="Cashdrawer" for="posagent_enable_cashdrawer" class="col-lg-4 o_light_label"/>
+                            <field name="posagent_enable_cashdrawer"/>
+                        </div>
+                        <div class="row">
+                            <label string="Preparation Printing" for="posagent_enable_preparation_printer" class="col-lg-4 o_light_label"/>
+                            <field name="posagent_enable_preparation_printer"/>
+                        </div>
+                        <div invisible="not posagent_enable_preparation_printer">
+                            <div class="row">
+                                <label string="Printer Mode" for="posagent_preparation_mode" class="col-lg-4 o_light_label"/>
+                                <field name="posagent_preparation_mode"/>
+                            </div>
+                            <div class="row" invisible="posagent_preparation_mode != 'single'">
+                                <label string="Printer Code" for="posagent_preparation_printer_code" class="col-lg-4 o_light_label"/>
+                                <field name="posagent_preparation_printer_code" placeholder="Leave empty for default printer"/>
+                            </div>
+                            <div class="row">
+                                <label string="Auto Cut" for="posagent_preparation_auto_cut" class="col-lg-4 o_light_label"/>
+                                <field name="posagent_preparation_auto_cut"/>
+                            </div>
+                            <field name="posagent_preparation_route_ids" nolabel="1" colspan="2">
+                                <list editable="bottom" string="Preparation Departments">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="category_id" options="{'no_create': True}"/>
+                                    <field name="printer_code" optional="show"/>
+                                </list>
+                            </field>
+                        </div>
                     </div>
-                    <div class="row">
-                        <label string="Receipt Printer" for="posagent_enable_printer" class="col-lg-4 o_light_label"/>
-                        <field name="posagent_enable_printer"/>
-                    </div>
-                    <div class="row" invisible="not posagent_enable_printer">
-                        <label string="Cashdrawer" for="posagent_enable_cashdrawer" class="col-lg-4 o_light_label"/>
-                        <field name="posagent_enable_cashdrawer"/>
-                    </div>
-                </div>
                 </setting>
             </xpath>
         </field>
