@@ -6,6 +6,13 @@ import { changesToOrder } from "@point_of_sale/app/models/utils/order_change";
 import { renderToElement } from "@web/core/utils/render";
 import { _t } from "@web/core/l10n/translation";
 
+function relationId(value) {
+    if (!value) {
+        return false;
+    }
+    return typeof value === "object" ? value.id : value;
+}
+
 function getPreparationHeaderLabel(order) {
     if (order.order_type === "dine_in") {
         return _t("Dine In");
@@ -21,7 +28,7 @@ function getPreparationHeaderLabel(order) {
 
 patch(PosStore.prototype, {
     async sendOrderInPreparation(order, cancelled = false) {
-        if (!this.config.use_posagent || !this.config.posagent_enable_printer) {
+        if (!this.config.use_posagent || !this.config.posagent_enable_preparation_printer) {
             return super.sendOrderInPreparation(...arguments);
         }
 
@@ -32,13 +39,31 @@ patch(PosStore.prototype, {
         });
     },
 
+    _getPOSAgentPreparationRoutes() {
+        const routeModel = this.models["posagent.preparation.route"];
+        if (!routeModel) {
+            return [];
+        }
+        return routeModel
+            .getAll()
+            .filter((route) => relationId(route.pos_config_id) === this.config.id)
+            .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+    },
+
     async _printLocalPrinterChanges(order, cancelled) {
-        const categoryIds = new Set(
-            this.models["pos.category"]
-                .getAll()
-                .filter((category) => category.print_on_local_printer)
-                .map((category) => category.id)
-        );
+        const routes = this._getPOSAgentPreparationRoutes();
+        if (!routes.length) {
+            return;
+        }
+
+        const routeByCategory = new Map();
+        for (const route of routes) {
+            const categoryId = relationId(route.category_id);
+            if (categoryId) {
+                routeByCategory.set(categoryId, route);
+            }
+        }
+        const categoryIds = new Set(routeByCategory.keys());
         if (!categoryIds.size) {
             return;
         }
@@ -62,16 +87,40 @@ patch(PosStore.prototype, {
             return groups;
         };
 
+        const getPrinterCode = (route) => {
+            if (this.config.posagent_preparation_mode === "department") {
+                const code = (route.printer_code || "").trim();
+                if (!code) {
+                    const department = route.category_id?.name || _t("Preparation Department");
+                    throw new Error(`POSAgent printer code is not configured for ${department}`);
+                }
+                return code;
+            }
+            return (this.config.posagent_preparation_printer_code || "").trim();
+        };
+
         for (const [categoryId, lines] of groupByCategory(orderChange.new)) {
-            const category = this.models["pos.category"].get(categoryId);
-            await this._printLocalReceipt(order, category?.name || _t("New"), lines);
+            const route = routeByCategory.get(categoryId);
+            const category = route?.category_id;
+            await this._printLocalReceipt(
+                order,
+                category?.name || _t("New"),
+                lines,
+                getPrinterCode(route)
+            );
         }
-        for (const lines of groupByCategory(orderChange.cancelled).values()) {
-            await this._printLocalReceipt(order, _t("Cancelled"), lines);
+        for (const [categoryId, lines] of groupByCategory(orderChange.cancelled)) {
+            const route = routeByCategory.get(categoryId);
+            await this._printLocalReceipt(
+                order,
+                _t("Cancelled"),
+                lines,
+                getPrinterCode(route)
+            );
         }
     },
 
-    async _printLocalReceipt(order, title, lines) {
+    async _printLocalReceipt(order, title, lines, printerCode = "") {
         const changes = this.getPrintingChanges(order, false);
         changes.headerLabel = getPreparationHeaderLabel(order);
         const receipt = renderToElement("pos_posagent.LocalPreparationReceipt", {
@@ -80,7 +129,11 @@ patch(PosStore.prototype, {
             changedlines: lines,
             fullReceipt: false,
         });
-        const printed = await this.printer.printHtml(receipt, { webPrintFallback: false });
+        const printed = await this.printer.printHtml(receipt, {
+            webPrintFallback: false,
+            posagentPrinterCode: printerCode,
+            posagentCut: Boolean(this.config.posagent_preparation_auto_cut),
+        });
         if (!printed) {
             throw new Error(`POSAgent preparation receipt failed: ${title}`);
         }
