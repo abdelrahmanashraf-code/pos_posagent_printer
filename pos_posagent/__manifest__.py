@@ -2,7 +2,7 @@
 
 {
     'name': 'POSAgent for Community Edition Direct Print Cash Drawer',
-    'version': '18.0.2.7.1',
+    'version': '18.0.2.7.2',
     'author': 'Diego A.',
     'support': 'diegoandino@gmail.com',
     'category': 'Sales/Point of Sale',
