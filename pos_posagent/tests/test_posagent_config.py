@@ -13,3 +13,26 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertFalse(config.use_posagent)
         self.assertFalse(config.posagent_enable_printer)
         self.assertFalse(config.posagent_enable_cashdrawer)
+        self.assertFalse(config.posagent_enable_preparation_printer)
+        self.assertEqual(config.posagent_preparation_mode, "single")
+        self.assertTrue(config.posagent_preparation_auto_cut)
+
+    def test_preparation_routes_are_per_pos(self):
+        config_a = self.env["pos.config"].create({"name": "Preparation A"})
+        config_b = self.env["pos.config"].create({"name": "Preparation B"})
+        category = self.env["pos.category"].create({"name": "Kitchen"})
+
+        route_a = self.env["posagent.preparation.route"].create({
+            "pos_config_id": config_a.id,
+            "category_id": category.id,
+            "printer_code": "kitchen-a",
+        })
+        route_b = self.env["posagent.preparation.route"].create({
+            "pos_config_id": config_b.id,
+            "category_id": category.id,
+            "printer_code": "kitchen-b",
+        })
+
+        self.assertEqual(config_a.posagent_preparation_route_ids, route_a)
+        self.assertEqual(config_b.posagent_preparation_route_ids, route_b)
+        self.assertNotEqual(route_a.printer_code, route_b.printer_code)
