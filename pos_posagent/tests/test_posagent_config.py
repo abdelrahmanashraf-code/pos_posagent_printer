@@ -105,3 +105,17 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertIn("/api/v1/test-print", widget)
         self.assertIn('registry.category("fields").add("posagent_printer"', widget)
         self.assertIn('widget="posagent_printer"', view)
+
+    def test_cashdrawer_uses_selected_receipt_printer(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "static"
+            / "src"
+            / "overrides"
+            / "models"
+            / "models.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("patch(HardwareProxy.prototype", source)
+        self.assertIn('action: "cashbox"', source)
+        self.assertIn('printer_name: config.posagent_receipt_printer_name || ""', source)
