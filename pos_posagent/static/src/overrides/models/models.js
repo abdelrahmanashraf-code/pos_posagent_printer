@@ -3,6 +3,7 @@
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { PosPrinterService } from "@point_of_sale/app/printer/pos_printer_service";
 import { HWPrinter } from "@point_of_sale/app/printer/hw_printer";
+import { HardwareProxy } from "@point_of_sale/app/services/hardware_proxy_service";
 import { toCanvas } from "@point_of_sale/app/utils/html-to-image";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { ConnectionLostError, RPCError } from "@web/core/network/rpc";
@@ -247,6 +248,26 @@ patch(PosPrinterService.prototype, {
         }
         console.error("POSAgent direct printing failed", error);
         return false;
+    },
+});
+
+patch(HardwareProxy.prototype, {
+    async openCashbox(action = false) {
+        const config = this.pos?.config;
+        if (!config?.use_posagent || !config?.posagent_enable_cashdrawer) {
+            return super.openCashbox(...arguments);
+        }
+
+        const isPrinterConnected = ["connected", "init"].includes(this.connectionInfo.status);
+        if (config.iface_cashdrawer && this.printer && isPrinterConnected) {
+            await this.printer.sendAction({
+                action: "cashbox",
+                printer_name: config.posagent_receipt_printer_name || "",
+            });
+            if (action) {
+                this.pos.logEmployeeMessage(action, "CASH_DRAWER_ACTION");
+            }
+        }
     },
 });
 
