@@ -102,7 +102,8 @@ class TestPOSAgentConfig(TransactionCase):
         widget = (
             module_root
             / "static"
-            / "src_backend"
+            / "src"
+            / "backend"
             / "printer_field.js"
         ).read_text(encoding="utf-8")
         view = (module_root / "views" / "pos_config_views.xml").read_text(encoding="utf-8")
@@ -125,3 +126,13 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertIn("patch(HardwareProxy.prototype", source)
         self.assertIn('action: "cashbox"', source)
         self.assertIn('printer_name: config.posagent_receipt_printer_name || ""', source)
+
+
+    def test_backend_assets_live_under_supported_odoo_static_path(self):
+        module_root = Path(__file__).resolve().parents[1]
+        manifest = (module_root / "__manifest__.py").read_text(encoding="utf-8")
+
+        self.assertTrue((module_root / "static" / "src" / "backend" / "printer_field.js").is_file())
+        self.assertTrue((module_root / "static" / "src" / "backend" / "printer_field.xml").is_file())
+        self.assertIn("'pos_posagent/static/src/backend/**/*'", manifest)
+        self.assertNotIn("static/src_backend", manifest)
