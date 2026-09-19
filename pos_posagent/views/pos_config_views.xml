@@ -22,7 +22,7 @@
                         </div>
                         <div class="row" invisible="not posagent_enable_printer">
                             <label string="Customer Receipt Printer" for="posagent_receipt_printer_name" class="col-lg-4 o_light_label"/>
-                            <field name="posagent_receipt_printer_name" placeholder="Leave empty for agent default printer"/>
+                            <field name="posagent_receipt_printer_name" widget="posagent_printer" options="{'port_field': 'pos_agent_port', 'allow_default': True}"/>
                         </div>
                         <div class="row" invisible="not posagent_enable_printer">
                             <label string="Cashdrawer" for="posagent_enable_cashdrawer" class="col-lg-4 o_light_label"/>
@@ -39,7 +39,7 @@
                             </div>
                             <div class="row" invisible="posagent_preparation_mode != 'single'">
                                 <label string="Preparation Printer" for="posagent_preparation_printer_name" class="col-lg-4 o_light_label"/>
-                                <field name="posagent_preparation_printer_name" placeholder="Leave empty for agent default printer"/>
+                                <field name="posagent_preparation_printer_name" widget="posagent_printer" options="{'port_field': 'pos_agent_port', 'allow_default': True}"/>
                                 <field name="posagent_preparation_printer_code" invisible="1"/>
                             </div>
                             <div class="row">
@@ -49,8 +49,9 @@
                             <field name="posagent_preparation_route_ids" nolabel="1" colspan="2">
                                 <list editable="bottom" string="Preparation Departments">
                                     <field name="sequence" widget="handle"/>
+                                    <field name="agent_port" column_invisible="True"/>
                                     <field name="category_id" options="{'no_create': True}"/>
-                                    <field name="printer_name" optional="show"/>
+                                    <field name="printer_name" widget="posagent_printer" options="{'port_field': 'agent_port'}" optional="show"/>
                                     <field name="printer_code" optional="hide"/>
                                 </list>
                             </field>
