@@ -1,0 +1,36 @@
+name: Odoo Module Static Checks
+
+on:
+  push:
+    branches:
+      - feature/ds-preparation-printing
+  pull_request:
+    paths:
+      - "pos_posagent/**"
+      - ".github/workflows/module-static-checks.yml"
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile Python
+        run: python -m compileall -q pos_posagent
+
+      - name: Parse XML
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          for path in Path("pos_posagent").rglob("*.xml"):
+              ET.parse(path)
+              print(f"OK {path}")
+          PY
+
+      - name: Check JavaScript syntax
+        run: |
+          find pos_posagent -type f -name '*.js' -print0 | while IFS= read -r -d '' file; do
+            node --check "$file"
+          done
