@@ -68,75 +68,89 @@ patch(PosStore.prototype, {
             return true;
         }
 
-        const routeByCategory = new Map();
-        for (const route of routes) {
-            const categoryId = relationId(route.category_id);
-            if (categoryId) {
-                routeByCategory.set(categoryId, route);
-            }
-        }
-        const categoryIds = new Set(routeByCategory.keys());
+        const categoryIds = new Set(
+            routes.map((route) => relationId(route.category_id)).filter(Boolean)
+        );
         if (!categoryIds.size) {
             return true;
         }
 
         const orderChange = changesToOrder(order, false, categoryIds, cancelled);
-        const groupByCategory = (lines) => {
+        const groupByRoute = (lines) => {
             const groups = new Map();
             for (const line of lines) {
                 const product = this.models["product.product"].get(line.product_id);
-                const category = product?.pos_categ_ids?.find((item) =>
-                    categoryIds.has(item.id)
+                const productCategoryIds = new Set(
+                    product?.parentPosCategIds ||
+                        product?.pos_categ_ids?.map((category) => relationId(category)) ||
+                        []
                 );
-                if (!category) {
+                const route = routes.find((item) =>
+                    productCategoryIds.has(relationId(item.category_id))
+                );
+                if (!route) {
                     continue;
                 }
-                if (!groups.has(category.id)) {
-                    groups.set(category.id, []);
+                if (!groups.has(route.id)) {
+                    groups.set(route.id, { route, lines: [] });
                 }
-                groups.get(category.id).push(line);
+                groups.get(route.id).lines.push(line);
             }
             return groups;
         };
 
-        const getPrinterCode = (route) => {
+        const getPrinterTarget = (route) => {
             if (this.config.posagent_preparation_mode === "department") {
-                const code = (route.printer_code || "").trim();
-                if (!code) {
-                    const department = route.category_id?.name || _t("Preparation Department");
-                    throw new Error(`POSAgent printer code is not configured for ${department}`);
+                const printerName = (route?.printer_name || "").trim();
+                if (printerName) {
+                    return { printerName, printerCode: "" };
                 }
-                return code;
+                const printerCode = (route?.printer_code || "").trim();
+                if (printerCode) {
+                    return { printerName: "", printerCode };
+                }
+                const department = route?.category_id?.name || _t("Preparation Department");
+                throw new Error(`POSAgent printer is not configured for ${department}`);
             }
-            return (this.config.posagent_preparation_printer_code || "").trim();
+
+            const printerName = (this.config.posagent_preparation_printer_name || "").trim();
+            if (printerName) {
+                return { printerName, printerCode: "" };
+            }
+            return {
+                printerName: "",
+                printerCode: (this.config.posagent_preparation_printer_code || "").trim(),
+            };
         };
 
         let allPrinted = true;
-        for (const [categoryId, lines] of groupByCategory(orderChange.new)) {
-            const route = routeByCategory.get(categoryId);
+        for (const { route, lines } of groupByRoute(orderChange.new).values()) {
             const category = route?.category_id;
+            const target = getPrinterTarget(route);
             const printed = await this._printLocalReceipt(
                 order,
                 category?.name || _t("New"),
                 lines,
-                getPrinterCode(route)
+                target.printerCode,
+                target.printerName
             );
             allPrinted = printed && allPrinted;
         }
-        for (const [categoryId, lines] of groupByCategory(orderChange.cancelled)) {
-            const route = routeByCategory.get(categoryId);
+        for (const { route, lines } of groupByRoute(orderChange.cancelled).values()) {
+            const target = getPrinterTarget(route);
             const printed = await this._printLocalReceipt(
                 order,
                 _t("Cancelled"),
                 lines,
-                getPrinterCode(route)
+                target.printerCode,
+                target.printerName
             );
             allPrinted = printed && allPrinted;
         }
         return allPrinted;
     },
 
-    async _printLocalReceipt(order, title, lines, printerCode = "") {
+    async _printLocalReceipt(order, title, lines, printerCode = "", printerName = "") {
         const changes = this.getPrintingChanges(order, false);
         changes.headerLabel = getPreparationHeaderLabel(order);
         const receipt = renderToElement("pos_posagent.LocalPreparationReceipt", {
@@ -149,6 +163,7 @@ patch(PosStore.prototype, {
             const printed = await this.printer.printHtml(receipt, {
                 webPrintFallback: false,
                 posagentPrinterCode: printerCode,
+                posagentPrinterName: printerName,
                 posagentCut: Boolean(this.config.posagent_preparation_auto_cut),
             });
             if (!printed) {
