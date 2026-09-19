@@ -205,23 +205,28 @@ patch(PosPrinterService.prototype, {
         this.state.isPrinting = true;
         try {
             const receipt = await this.renderer.toHtml(component, props);
-            return await this.printHtml(receipt, options);
+            return await this.printHtml(receipt, {
+                ...(options || {}),
+                posagentPrinterName: posAgentConfig(this)?.posagent_receipt_printer_name || "",
+            });
         } finally {
             this.state.isPrinting = false;
         }
     },
 
     async printHtml(receipt, options = {}) {
-        const isPreparationJob =
+        const isPOSAgentJob =
             usesPOSAgentProxy(this) &&
-            (Object.prototype.hasOwnProperty.call(options, "posagentPrinterCode") ||
+            (Object.prototype.hasOwnProperty.call(options, "posagentPrinterName") ||
+                Object.prototype.hasOwnProperty.call(options, "posagentPrinterCode") ||
                 Object.prototype.hasOwnProperty.call(options, "posagentCut"));
-        if (isPreparationJob && this.hardware_proxy.printer) {
+        if (isPOSAgentJob && this.hardware_proxy.printer) {
             this.hardware_proxy.printer._isPOSAgent = true;
             const result = await this.hardware_proxy.printer.printPOSAgentReceipt(
                 receipt,
                 options.posagentPrinterCode || "",
-                Boolean(options.posagentCut)
+                Boolean(options.posagentCut),
+                options.posagentPrinterName || ""
             );
             return Boolean(result?.successful);
         }
@@ -246,21 +251,23 @@ patch(PosPrinterService.prototype, {
 });
 
 patch(HWPrinter.prototype, {
-    async printPOSAgentReceipt(receipt, printerCode = "", cut = false) {
+    async printPOSAgentReceipt(receipt, printerCode = "", cut = false, printerName = "") {
         if (receipt) {
-            this.receiptQueue.push({ receipt, printerCode, cut });
+            this.receiptQueue.push({ receipt, printerCode, cut, printerName });
         }
         while (this.receiptQueue.length) {
             const queued = this.receiptQueue.shift();
             const queuedReceipt = queued?.receipt || queued;
             const queuedCode = queued?.printerCode || "";
             const queuedCut = Boolean(queued?.cut);
+            const queuedPrinterName = queued?.printerName || "";
             try {
                 const canvas = await posAgentReceiptToCanvas(queuedReceipt);
                 const result = await this.sendAction({
                     action: "print_receipt",
                     receipt: this.processCanvas(canvas),
                     printer_code: queuedCode,
+                    printer_name: queuedPrinterName,
                     cut: queuedCut,
                 });
                 if (!result || result.result === false) {
