@@ -23,9 +23,13 @@ class PosAgentPreparationRoute(models.Model):
         required=True,
         ondelete="cascade",
     )
+    printer_name = fields.Char(
+        string="Printer",
+        help="Exact Windows printer name used for this preparation department.",
+    )
     printer_code = fields.Char(
-        string="Printer Code",
-        help="DS POS Print Agent route code used in Printer per Department mode.",
+        string="Legacy Printer Code",
+        help="Legacy DS POS Print Agent route code kept for backward compatibility.",
     )
 
     _sql_constraints = [
@@ -42,4 +46,4 @@ class PosAgentPreparationRoute(models.Model):
         return [("pos_config_id", "=", config_id)] if config_id else [("id", "=", 0)]
 
     def _load_pos_data_fields(self, config_id):
-        return ["id", "sequence", "pos_config_id", "category_id", "printer_code"]
+        return ["id", "sequence", "pos_config_id", "category_id", "printer_name", "printer_code"]
