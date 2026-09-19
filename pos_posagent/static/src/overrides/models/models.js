@@ -3,6 +3,7 @@
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { PosPrinterService } from "@point_of_sale/app/printer/pos_printer_service";
 import { HWPrinter } from "@point_of_sale/app/printer/hw_printer";
+import { HardwareProxy } from "@point_of_sale/app/services/hardware_proxy_service";
 import { toCanvas } from "@point_of_sale/app/utils/html-to-image";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { ConnectionLostError, RPCError } from "@web/core/network/rpc";
@@ -10,10 +11,20 @@ import { handleRPCError } from "@point_of_sale/app/errors/error_handlers";
 import { serializeDateTime } from "@web/core/l10n/dates";
 import { patch } from "@web/core/utils/patch";
 
-function usesPOSAgent(printerService) {
+function posAgentConfig(printerService) {
+    return printerService.hardware_proxy?.pos?.config;
+}
+
+function usesPOSAgentReceipt(printerService) {
+    const config = posAgentConfig(printerService);
+    return Boolean(config?.use_posagent && config?.posagent_enable_printer);
+}
+
+function usesPOSAgentProxy(printerService) {
+    const config = posAgentConfig(printerService);
     return Boolean(
-        printerService.hardware_proxy?.pos?.config?.use_posagent &&
-            printerService.hardware_proxy?.pos?.config?.posagent_enable_printer
+        config?.use_posagent &&
+            (config?.posagent_enable_printer || config?.posagent_enable_preparation_printer)
     );
 }
 
@@ -96,7 +107,10 @@ async function posAgentReceiptToCanvas(receipt) {
 patch(PosStore.prototype, {
     async afterProcessServerData() {
         const result = await super.afterProcessServerData(...arguments);
-        if (this.config.use_posagent && this.config.posagent_enable_printer) {
+        const useReceipt = this.config.use_posagent && this.config.posagent_enable_printer;
+        const usePreparation =
+            this.config.use_posagent && this.config.posagent_enable_preparation_printer;
+        if (useReceipt || usePreparation) {
             this.config.is_posbox = true;
             this.config.iface_print_via_proxy = true;
             this.config.iface_cashdrawer = Boolean(this.config.posagent_enable_cashdrawer);
@@ -104,10 +118,11 @@ patch(PosStore.prototype, {
             this.config.iface_electronic_scale = false;
             this.config.iface_customer_facing_display_via_proxy = false;
             this.config.proxy_ip = `http://127.0.0.1:${this.config.pos_agent_port}`;
+        }
 
+        if (useReceipt) {
             const companyLogo = `/web/image?model=res.company&id=${this.company.id}&field=logo`;
             cacheReceiptImage(companyLogo);
-
             this.config.iface_print_auto = true;
             this.config.iface_print_skip_screen = true;
         }
@@ -151,16 +166,20 @@ patch(PosStore.prototype, {
         this._posAgentScheduledOrderPrints.add(order);
 
         void this._enqueuePOSAgentOrderPrint(async () => {
-            try {
-                await this.printReceipt({ order });
-            } catch (error) {
-                console.error("POSAgent customer receipt failed", error);
+            if (this.config.posagent_enable_printer) {
+                try {
+                    await this.printReceipt({ order });
+                } catch (error) {
+                    console.error("POSAgent customer receipt failed", error);
+                }
             }
 
-            try {
-                await this.sendOrderInPreparation(order);
-            } catch (error) {
-                console.error("POSAgent preparation printing failed", error);
+            if (this.config.posagent_enable_preparation_printer) {
+                try {
+                    await this.sendOrderInPreparation(order);
+                } catch (error) {
+                    console.error("POSAgent preparation printing failed", error);
+                }
             }
         });
         return true;
@@ -177,7 +196,7 @@ patch(PosStore.prototype, {
 
 patch(PosPrinterService.prototype, {
     async print(component, props, options) {
-        if (!usesPOSAgent(this)) {
+        if (!usesPOSAgentReceipt(this)) {
             return super.print(...arguments);
         }
 
@@ -187,14 +206,36 @@ patch(PosPrinterService.prototype, {
         this.state.isPrinting = true;
         try {
             const receipt = await this.renderer.toHtml(component, props);
-            return await this.printHtml(receipt, options);
+            return await this.printHtml(receipt, {
+                ...(options || {}),
+                posagentPrinterName: posAgentConfig(this)?.posagent_receipt_printer_name || "",
+            });
         } finally {
             this.state.isPrinting = false;
         }
     },
 
+    async printHtml(receipt, options = {}) {
+        const isPOSAgentJob =
+            usesPOSAgentProxy(this) &&
+            (Object.prototype.hasOwnProperty.call(options, "posagentPrinterName") ||
+                Object.prototype.hasOwnProperty.call(options, "posagentPrinterCode") ||
+                Object.prototype.hasOwnProperty.call(options, "posagentCut"));
+        if (isPOSAgentJob && this.hardware_proxy.printer) {
+            this.hardware_proxy.printer._isPOSAgent = true;
+            const result = await this.hardware_proxy.printer.printPOSAgentReceipt(
+                receipt,
+                options.posagentPrinterCode || "",
+                Boolean(options.posagentCut),
+                options.posagentPrinterName || ""
+            );
+            return Boolean(result?.successful);
+        }
+        return super.printHtml(...arguments);
+    },
+
     printWeb() {
-        if (usesPOSAgent(this)) {
+        if (usesPOSAgentReceipt(this)) {
             console.error("POSAgent web print fallback suppressed");
             return false;
         }
@@ -202,7 +243,7 @@ patch(PosPrinterService.prototype, {
     },
 
     async printHtmlAlternative(error) {
-        if (!usesPOSAgent(this)) {
+        if (!usesPOSAgentReceipt(this)) {
             return super.printHtmlAlternative(...arguments);
         }
         console.error("POSAgent direct printing failed", error);
@@ -210,20 +251,46 @@ patch(PosPrinterService.prototype, {
     },
 });
 
-patch(HWPrinter.prototype, {
-    async printReceipt(receipt) {
-        if (!this._isPOSAgent) {
-            return super.printReceipt(...arguments);
+patch(HardwareProxy.prototype, {
+    async openCashbox(action = false) {
+        const config = this.pos?.config;
+        if (!config?.use_posagent || !config?.posagent_enable_cashdrawer) {
+            return super.openCashbox(...arguments);
         }
 
+        const isPrinterConnected = ["connected", "init"].includes(this.connectionInfo.status);
+        if (config.iface_cashdrawer && this.printer && isPrinterConnected) {
+            await this.printer.sendAction({
+                action: "cashbox",
+                printer_name: config.posagent_receipt_printer_name || "",
+            });
+            if (action) {
+                this.pos.logEmployeeMessage(action, "CASH_DRAWER_ACTION");
+            }
+        }
+    },
+});
+
+patch(HWPrinter.prototype, {
+    async printPOSAgentReceipt(receipt, printerCode = "", cut = false, printerName = "") {
         if (receipt) {
-            this.receiptQueue.push(receipt);
+            this.receiptQueue.push({ receipt, printerCode, cut, printerName });
         }
         while (this.receiptQueue.length) {
-            const queuedReceipt = this.receiptQueue.shift();
+            const queued = this.receiptQueue.shift();
+            const queuedReceipt = queued?.receipt || queued;
+            const queuedCode = queued?.printerCode || "";
+            const queuedCut = Boolean(queued?.cut);
+            const queuedPrinterName = queued?.printerName || "";
             try {
                 const canvas = await posAgentReceiptToCanvas(queuedReceipt);
-                const result = await this.sendPrintingJob(this.processCanvas(canvas));
+                const result = await this.sendAction({
+                    action: "print_receipt",
+                    receipt: this.processCanvas(canvas),
+                    printer_code: queuedCode,
+                    printer_name: queuedPrinterName,
+                    cut: queuedCut,
+                });
                 if (!result || result.result === false) {
                     this.receiptQueue.length = 0;
                     return this.getResultsError(result);
@@ -235,6 +302,13 @@ patch(HWPrinter.prototype, {
             }
         }
         return { successful: true };
+    },
+
+    async printReceipt(receipt) {
+        if (!this._isPOSAgent) {
+            return super.printReceipt(...arguments);
+        }
+        return this.printPOSAgentReceipt(receipt);
     },
 });
 
