@@ -19,6 +19,7 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertFalse(config.posagent_enable_preparation_printer)
         self.assertEqual(config.posagent_preparation_mode, "single")
         self.assertTrue(config.posagent_preparation_auto_cut)
+        self.assertFalse(config.posagent_preparation_printer_name)
 
     def test_preparation_routes_are_per_pos(self):
         config_a = self.env["pos.config"].create({"name": "Preparation A"})
@@ -28,17 +29,17 @@ class TestPOSAgentConfig(TransactionCase):
         route_a = self.env["posagent.preparation.route"].create({
             "pos_config_id": config_a.id,
             "category_id": category.id,
-            "printer_code": "kitchen-a",
+            "printer_name": "Kitchen A",
         })
         route_b = self.env["posagent.preparation.route"].create({
             "pos_config_id": config_b.id,
             "category_id": category.id,
-            "printer_code": "kitchen-b",
+            "printer_name": "Kitchen B",
         })
 
         self.assertEqual(config_a.posagent_preparation_route_ids, route_a)
         self.assertEqual(config_b.posagent_preparation_route_ids, route_b)
-        self.assertNotEqual(route_a.printer_code, route_b.printer_code)
+        self.assertNotEqual(route_a.printer_name, route_b.printer_name)
 
     def test_preparation_receipt_uses_ds_service_type(self):
         source = (
@@ -74,3 +75,18 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertIn("posagent_receipt_printer_name", source)
         self.assertIn("posagentPrinterName", source)
         self.assertIn("printer_name: queuedPrinterName", source)
+
+    def test_preparation_uses_direct_printer_name_and_parent_categories(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "static"
+            / "src"
+            / "overrides"
+            / "models"
+            / "local_printer.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("product?.parentPosCategIds", source)
+        self.assertIn("route?.printer_name", source)
+        self.assertIn("posagent_preparation_printer_name", source)
+        self.assertIn("posagentPrinterName: printerName", source)
