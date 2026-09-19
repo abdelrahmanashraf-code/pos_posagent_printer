@@ -22,8 +22,14 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertFalse(config.posagent_preparation_printer_name)
 
     def test_preparation_routes_are_per_pos(self):
-        config_a = self.env["pos.config"].create({"name": "Preparation A"})
-        config_b = self.env["pos.config"].create({"name": "Preparation B"})
+        config_a = self.env["pos.config"].create({
+            "name": "Preparation A",
+            "payment_method_ids": [(6, 0, [])],
+        })
+        config_b = self.env["pos.config"].create({
+            "name": "Preparation B",
+            "payment_method_ids": [(6, 0, [])],
+        })
         category = self.env["pos.category"].create({"name": "Kitchen"})
 
         route_a = self.env["posagent.preparation.route"].create({
