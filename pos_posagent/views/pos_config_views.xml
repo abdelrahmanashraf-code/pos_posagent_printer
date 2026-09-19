@@ -38,8 +38,9 @@
                                 <field name="posagent_preparation_mode"/>
                             </div>
                             <div class="row" invisible="posagent_preparation_mode != 'single'">
-                                <label string="Printer Code" for="posagent_preparation_printer_code" class="col-lg-4 o_light_label"/>
-                                <field name="posagent_preparation_printer_code" placeholder="Leave empty for default printer"/>
+                                <label string="Preparation Printer" for="posagent_preparation_printer_name" class="col-lg-4 o_light_label"/>
+                                <field name="posagent_preparation_printer_name" placeholder="Leave empty for agent default printer"/>
+                                <field name="posagent_preparation_printer_code" invisible="1"/>
                             </div>
                             <div class="row">
                                 <label string="Auto Cut" for="posagent_preparation_auto_cut" class="col-lg-4 o_light_label"/>
@@ -49,7 +50,8 @@
                                 <list editable="bottom" string="Preparation Departments">
                                     <field name="sequence" widget="handle"/>
                                     <field name="category_id" options="{'no_create': True}"/>
-                                    <field name="printer_code" optional="show"/>
+                                    <field name="printer_name" optional="show"/>
+                                    <field name="printer_code" optional="hide"/>
                                 </list>
                             </field>
                         </div>
