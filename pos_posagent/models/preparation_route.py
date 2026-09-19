@@ -23,6 +23,11 @@ class PosAgentPreparationRoute(models.Model):
         required=True,
         ondelete="cascade",
     )
+    agent_port = fields.Integer(
+        related="pos_config_id.pos_agent_port",
+        string="Agent Port",
+        readonly=True,
+    )
     printer_name = fields.Char(
         string="Printer",
         help="Exact Windows printer name used for this preparation department.",
