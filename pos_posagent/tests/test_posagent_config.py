@@ -90,3 +90,18 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertIn("route?.printer_name", source)
         self.assertIn("posagent_preparation_printer_name", source)
         self.assertIn("posagentPrinterName: printerName", source)
+
+    def test_backend_printer_selector_uses_agent_discovery(self):
+        module_root = Path(__file__).resolve().parents[1]
+        widget = (
+            module_root
+            / "static"
+            / "src_backend"
+            / "printer_field.js"
+        ).read_text(encoding="utf-8")
+        view = (module_root / "views" / "pos_config_views.xml").read_text(encoding="utf-8")
+
+        self.assertIn("/api/v1/printers", widget)
+        self.assertIn("/api/v1/test-print", widget)
+        self.assertIn('registry.category("fields").add("posagent_printer"', widget)
+        self.assertIn('widget="posagent_printer"', view)
