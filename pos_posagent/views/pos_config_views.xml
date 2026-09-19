@@ -21,6 +21,10 @@
                             <field name="posagent_enable_printer"/>
                         </div>
                         <div class="row" invisible="not posagent_enable_printer">
+                            <label string="Customer Receipt Printer" for="posagent_receipt_printer_name" class="col-lg-4 o_light_label"/>
+                            <field name="posagent_receipt_printer_name" placeholder="Leave empty for agent default printer"/>
+                        </div>
+                        <div class="row" invisible="not posagent_enable_printer">
                             <label string="Cashdrawer" for="posagent_enable_cashdrawer" class="col-lg-4 o_light_label"/>
                             <field name="posagent_enable_cashdrawer"/>
                         </div>
