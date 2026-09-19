@@ -14,6 +14,7 @@ class TestPOSAgentConfig(TransactionCase):
         config = self.env["pos.config"].new()
         self.assertFalse(config.use_posagent)
         self.assertFalse(config.posagent_enable_printer)
+        self.assertFalse(config.posagent_receipt_printer_name)
         self.assertFalse(config.posagent_enable_cashdrawer)
         self.assertFalse(config.posagent_enable_preparation_printer)
         self.assertEqual(config.posagent_preparation_mode, "single")
@@ -59,3 +60,17 @@ class TestPOSAgentConfig(TransactionCase):
         self.assertIn('return _t("Dine In");', source)
         self.assertIn('return _t("Takeaway");', source)
         self.assertIn('return _t("Delivery");', source)
+
+    def test_customer_receipt_printer_is_sent_by_name(self):
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "static"
+            / "src"
+            / "overrides"
+            / "models"
+            / "models.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("posagent_receipt_printer_name", source)
+        self.assertIn("posagentPrinterName", source)
+        self.assertIn("printer_name: queuedPrinterName", source)
