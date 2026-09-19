@@ -33,12 +33,16 @@ class PosConfig(models.Model):
         default="single",
         required=True,
     )
-    posagent_preparation_printer_code = fields.Char(
-        string="Preparation Printer Code",
+    posagent_preparation_printer_name = fields.Char(
+        string="Preparation Printer",
         help=(
-            "Printer route code used for all preparation departments in Single Printer mode. "
-            "Leave empty to use the Print Agent default printer."
+            "Exact Windows printer name used for all preparation departments in Single Printer mode. "
+            "Leave empty to use the DS POS Print Agent default printer."
         ),
+    )
+    posagent_preparation_printer_code = fields.Char(
+        string="Legacy Preparation Printer Code",
+        help="Legacy DS POS Print Agent route code kept for backward compatibility.",
     )
     posagent_preparation_auto_cut = fields.Boolean(
         string="Auto Cut Preparation Tickets",
