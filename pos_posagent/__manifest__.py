@@ -2,7 +2,7 @@
 
 {
     'name': 'POSAgent for Community Edition Direct Print Cash Drawer',
-    'version': '18.0.2.7.2',
+    'version': '18.0.2.8.0',
     'author': 'Diego A.',
     'support': 'diegoandino@gmail.com',
     'category': 'Sales/Point of Sale',
@@ -27,6 +27,9 @@ browser print dialog when the local agent is unavailable.
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_posagent/static/src/**/*',
+        ],
+        'web.assets_backend': [
+            'pos_posagent/static/src_backend/**/*',
         ],
     },
     'license': 'LGPL-3',
