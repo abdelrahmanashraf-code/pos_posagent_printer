@@ -10,6 +10,13 @@ class PosConfig(models.Model):
     use_posagent = fields.Boolean(string="POS Agent")
     pos_agent_port = fields.Integer(string="Proxy Port", default=9069)
     posagent_enable_printer = fields.Boolean(string="Receipt Printer")
+    posagent_receipt_printer_name = fields.Char(
+        string="Customer Receipt Printer",
+        help=(
+            "Exact Windows printer name used for customer receipts. "
+            "Leave empty to use the DS POS Print Agent default printer."
+        ),
+    )
     posagent_enable_cashdrawer = fields.Boolean(string="Cash Drawer")
 
     posagent_enable_preparation_printer = fields.Boolean(
